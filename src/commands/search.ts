@@ -8,8 +8,8 @@ export function registerSearchCommands(program: Command): void {
     .option("--cuisine <type>", "Filter by cuisine type")
     .option("--limit <n>", "Max results", parseInt)
     .action(async (query: string, opts: { cuisine?: string; limit?: number }) => {
-      const client = createClient();
       try {
+        const client = createClient();
         const results = await client.searchRestaurants(query, opts.cuisine, opts.limit);
         persistClient(client);
         console.log(JSON.stringify(results, null, 2));
@@ -23,8 +23,8 @@ export function registerSearchCommands(program: Command): void {
     .command("outlets <chain_code>")
     .description("List all outlets for a restaurant chain")
     .action(async (chainCode: string) => {
-      const client = createClient();
       try {
+        const client = createClient();
         const outlets = await client.getChainOutlets(chainCode);
         persistClient(client);
         console.log(JSON.stringify(outlets, null, 2));
@@ -38,8 +38,8 @@ export function registerSearchCommands(program: Command): void {
     .command("restaurant <vendor_code>")
     .description("Get restaurant details")
     .action(async (vendorCode: string) => {
-      const client = createClient();
       try {
+        const client = createClient();
         const details = await client.getRestaurantDetails(vendorCode);
         persistClient(client);
         console.log(JSON.stringify(details, null, 2));

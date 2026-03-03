@@ -6,8 +6,8 @@ export function registerMenuCommands(program: Command): void {
     .command("menu <vendor_code>")
     .description("Get restaurant menu organized by category")
     .action(async (vendorCode: string) => {
-      const client = createClient();
       try {
+        const client = createClient();
         const menu = await client.getMenu(vendorCode);
         // Compact view: strip topping_groups for readability
         const compact = menu.map((cat) => ({
@@ -32,8 +32,8 @@ export function registerMenuCommands(program: Command): void {
     .command("item <vendor_code> <product_code>")
     .description("Get full item details including toppings and variations")
     .action(async (vendorCode: string, productCode: string) => {
-      const client = createClient();
       try {
+        const client = createClient();
         const menu = await client.getMenu(vendorCode);
         for (const cat of menu) {
           const item = cat.items.find((i) => i.code === productCode);
