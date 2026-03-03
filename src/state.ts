@@ -3,6 +3,7 @@ import { join } from "path";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { FoodpandaClient, type SerializedState } from "./foodpanda-client.js";
 import { loadPersistedToken } from "./token-manager.js";
+import { loadPersistedLocation } from "./location-manager.js";
 
 const STATE_DIR = join(homedir(), ".foodpanda-cli");
 const STATE_FILE = join(STATE_DIR, "state.json");
@@ -32,14 +33,15 @@ export function createClient(): FoodpandaClient {
   const sessionToken =
     loadPersistedToken() || process.env.FOODPANDA_SESSION_TOKEN || null;
 
-  const latitude = parseFloat(process.env.FOODPANDA_LATITUDE || "");
-  const longitude = parseFloat(process.env.FOODPANDA_LONGITUDE || "");
+  const location = loadPersistedLocation();
 
-  if (isNaN(latitude) || isNaN(longitude)) {
+  if (!location) {
     throw new Error(
-      "FOODPANDA_LATITUDE and FOODPANDA_LONGITUDE environment variables are required."
+      "Location not set. Run: foodpanda-cli location <latitude> <longitude>"
     );
   }
+
+  const { latitude, longitude } = location;
 
   const client = new FoodpandaClient(sessionToken, latitude, longitude);
 

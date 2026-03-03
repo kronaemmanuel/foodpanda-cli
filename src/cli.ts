@@ -6,6 +6,7 @@ import { registerMenuCommands } from "./commands/menu.js";
 import { registerCartCommands } from "./commands/cart.js";
 import { registerOrderCommands } from "./commands/order.js";
 import { registerAuthCommands } from "./commands/auth.js";
+import { registerLocationCommands } from "./commands/location.js";
 
 const program = new Command();
 
@@ -19,5 +20,6 @@ registerMenuCommands(program);
 registerCartCommands(program);
 registerOrderCommands(program);
 registerAuthCommands(program);
+registerLocationCommands(program);
 
 program.parse();
