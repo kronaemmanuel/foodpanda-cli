@@ -24,6 +24,7 @@ const GRAPHQL_SEARCH_HASH =
   "6d4dea2e0c8ab03c0d2934ca3db20b8914fc17e4109fb103307e4c077ba8506d";
 const GRAPHQL_VENDOR_LIST_HASH =
   "ee02950ba8ef08427ef979e3954e3c1367c5636b18d6fc8a850ebf5fbf49d999";
+const MENU_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 /** Shared shape for vendor menu data from the REST API */
 interface VendorMenuData {
@@ -624,9 +625,8 @@ export class FoodpandaClient {
 
   async getMenu(vendorCode: string): Promise<MenuCategory[]> {
     // Check cache first (15 min TTL)
-    const CACHE_TTL_MS = 15 * 60 * 1000;
     const cached = this.menuCache.get(vendorCode);
-    if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+    if (cached && Date.now() - cached.cachedAt < MENU_CACHE_TTL_MS) {
       return cached.categories;
     }
 
@@ -1621,11 +1621,10 @@ export class FoodpandaClient {
 
     // Rebuild Maps from serialized arrays
     this.menuCache = new Map();
-    const CACHE_TTL = 15 * 60 * 1000;
     const now = Date.now();
     for (const entry of state.menuCache) {
       // Skip expired cache entries
-      if (now - entry.value.cachedAt > CACHE_TTL) continue;
+      if (now - entry.value.cachedAt > MENU_CACHE_TTL_MS) continue;
       this.menuCache.set(entry.key, {
         vendorCode: entry.value.vendorCode,
         vendorName: entry.value.vendorName,
