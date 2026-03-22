@@ -1,8 +1,9 @@
 import { homedir } from "os";
 import { join } from "path";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { APP_DATA_DIR } from "./config.js";
 
-const LOCATION_DIR = join(homedir(), ".foodpanda-cli");
+const LOCATION_DIR = join(homedir(), APP_DATA_DIR);
 const LOCATION_FILE = join(LOCATION_DIR, "location.json");
 
 interface PersistedLocation {

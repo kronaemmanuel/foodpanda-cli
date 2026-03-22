@@ -4,8 +4,9 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { FoodpandaClient, type SerializedState } from "./foodpanda-client.js";
 import { loadPersistedToken } from "./token-manager.js";
 import { loadPersistedLocation } from "./location-manager.js";
+import { APP_DATA_DIR, APP_NAME, SESSION_TOKEN_ENV_VAR } from "./config.js";
 
-const STATE_DIR = join(homedir(), ".foodpanda-cli");
+const STATE_DIR = join(homedir(), APP_DATA_DIR);
 const STATE_FILE = join(STATE_DIR, "state.json");
 
 function loadState(): SerializedState | null {
@@ -31,13 +32,13 @@ function saveState(state: SerializedState): void {
  */
 export function createClient(): FoodpandaClient {
   const sessionToken =
-    loadPersistedToken() || process.env.FOODPANDA_SESSION_TOKEN || null;
+    loadPersistedToken() || process.env[SESSION_TOKEN_ENV_VAR] || null;
 
   const location = loadPersistedLocation();
 
   if (!location) {
     throw new Error(
-      "Location not set. Run: foodpanda-cli location <latitude> <longitude>"
+      `Location not set. Run: ${APP_NAME} location <latitude> <longitude>`
     );
   }
 

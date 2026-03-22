@@ -1,19 +1,19 @@
 {
-  "name": "foodpanda-cli",
+  "name": "foodpanda-pk-cli",
   "version": "0.1.0",
-  "description": "CLI for ordering food from foodpanda.ph — designed for AI assistants",
+  "description": "CLI for ordering food from foodpanda.pk — designed for AI assistants",
   "type": "module",
   "bin": {
-    "foodpanda-cli": "./build/cli.js"
+    "foodpanda-pk-cli": "./build/cli.js"
   },
   "scripts": {
-    "build": "tsc && chmod 755 build/cli.js",
-    "dev": "tsc --watch",
+    "build": "node ./node_modules/typescript/bin/tsc",
+    "dev": "node ./node_modules/typescript/bin/tsc --watch",
     "start": "node build/cli.js",
     "prepublishOnly": "npm run build"
   },
   "files": ["build"],
-  "keywords": ["foodpanda", "food-delivery", "ai-assistant", "cli", "philippines"],
+  "keywords": ["foodpanda", "food-delivery", "ai-assistant", "cli", "pakistan", "multan"],
   "author": "John Carlo Joyo",
   "license": "MIT",
   "dependencies": {

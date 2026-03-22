@@ -1,214 +1,149 @@
 ---
-name: foodpanda-cli
+name: foodpanda-pk-cli
 description: >-
-  Order food from foodpanda.ph using the foodpanda-cli command-line tool.
+  Order food from foodpanda.pk using the foodpanda-pk-cli command-line tool.
   Use when the user wants to search restaurants, browse menus, build a cart,
-  or place a food delivery order in the Philippines.
+  preview a food delivery order, or place a Cash on Delivery order in Pakistan.
   Requires Node.js and shell access.
-compatibility: Requires Node.js 18+, npm, and shell access. Philippines only (foodpanda.ph).
+compatibility: Requires Node.js 18+, npm, and shell access. Pakistan only (foodpanda.pk).
 metadata:
   author: johnwhoyou
   version: "0.1.0"
 ---
 
-# foodpanda-cli
+# foodpanda-pk-cli
 
-A command-line tool for ordering food delivery from foodpanda.ph. All commands output structured JSON to stdout. Designed for the Philippines market only.
+A command-line tool for browsing foodpanda Pakistan restaurants and building carts. All commands output structured JSON to stdout.
 
-## Prerequisites & Installation
+## Prerequisites and installation
 
-Ensure Node.js 18+ and npm are available, then install globally:
-
-```bash
-npm install -g foodpanda-cli
-```
-
-Verify the installation:
+Ensure Node.js 18+ and npm are available, then install dependencies and build:
 
 ```bash
-foodpanda-cli --version
+npm install
+npm run build
 ```
 
-## Initial Setup (One-Time)
+Optional global install:
 
-Before using any other commands, complete these two setup steps:
+```bash
+npm install -g .
+foodpanda-pk-cli --version
+```
+
+## Initial setup
+
+Before using any other commands, complete these two setup steps.
 
 ### 1. Set delivery location
 
-Provide the user's delivery coordinates (latitude and longitude in the Philippines):
+Provide the user's delivery coordinates in Pakistan:
 
 ```bash
-foodpanda-cli location <latitude> <longitude>
+foodpanda-pk-cli location <latitude> <longitude>
 ```
 
-Example:
+Multan example:
 
 ```bash
-foodpanda-cli location 14.5995 120.9842
-# => {"success": true, "latitude": 14.5995, "longitude": 120.9842}
+foodpanda-pk-cli location 30.2088719 71.4886923
 ```
 
 ### 2. Log in
 
-Opens a browser window for the user to log in to their foodpanda account. The session token is captured automatically. This step requires user interaction.
+Opens a browser window for the user to log in to foodpanda Pakistan. The session token is captured automatically.
 
 ```bash
-foodpanda-cli login
+foodpanda-pk-cli login
 ```
 
-An optional `--timeout <seconds>` flag controls how long to wait (default: 120s).
-
-## Command Reference
-
-### Search & Discovery
-
-**Search restaurants:**
+Optional timeout:
 
 ```bash
-foodpanda-cli search <query> [--cuisine <type>] [--limit <n>]
+foodpanda-pk-cli login --timeout 180
 ```
 
-Returns an array of matching restaurants with `id` (vendor code), `name`, `cuisine`, `rating`, `delivery_fee`, `delivery_time`, `is_open`, and optionally `chain_code`.
-
-**List chain outlets:**
+Fallback:
 
 ```bash
-foodpanda-cli outlets <chain_code>
+$env:FOODPANDA_PK_SESSION_TOKEN = "your-session-token"
 ```
 
-Lists all branches of a restaurant chain. Use the `chain_code` from search results.
+## Command reference
 
-**Get restaurant details:**
+### Search and discovery
 
 ```bash
-foodpanda-cli restaurant <vendor_code>
+foodpanda-pk-cli search <query> [--cuisine <type>] [--limit <n>]
+foodpanda-pk-cli outlets <chain_code>
+foodpanda-pk-cli restaurant <vendor_code>
 ```
 
-Returns full details: address, description, opening hours, delivery availability.
-
-### Menu & Items
-
-**Browse menu:**
+### Menu and items
 
 ```bash
-foodpanda-cli menu <vendor_code>
+foodpanda-pk-cli menu <vendor_code>
+foodpanda-pk-cli item <vendor_code> <product_code>
 ```
 
-Returns the menu organized by category. Each item includes `code`, `name`, `price`, and `description`. Use item codes for adding to cart.
-
-**Get item details (toppings & variations):**
+### Cart management
 
 ```bash
-foodpanda-cli item <vendor_code> <product_code>
+foodpanda-pk-cli add <vendor_code> --items '<json_array>'
+foodpanda-pk-cli add <vendor_code> --items-file .\items.json
+foodpanda-pk-cli add <vendor_code> --item-id product-code --quantity 1
+foodpanda-pk-cli cart
+foodpanda-pk-cli remove <cart_item_id>
 ```
 
-Returns full item details including `topping_groups` (with options, prices, and min/max quantities) and `variation` info. Always check this before adding items with customizations.
+For Windows shells, prefer `--items-file` or single-item flags instead of hand-escaped JSON when possible.
 
-### Cart Management
-
-**Add items to cart:**
+### Saved addresses
 
 ```bash
-foodpanda-cli add <vendor_code> --items '<json_array>'
+foodpanda-pk-cli addresses
+foodpanda-pk-cli address-use <address_id>
+foodpanda-pk-cli address-auto
+foodpanda-pk-cli address-current
 ```
 
-The `--items` flag takes a JSON array. Each element:
+Use `addresses` to list saved addresses, `address-use` to pin preview/order to one saved address and sync the CLI location to it, `address-auto` to return to nearest-address selection, and `address-current` to inspect the active address/location state.
 
-```json
-[
-  {
-    "item_id": "product-code",
-    "quantity": 1,
-    "topping_ids": ["101", "205"],
-    "special_instructions": "No onions"
-  }
-]
-```
-
-Only `item_id` and `quantity` are required. `topping_ids` and `special_instructions` are optional.
-
-**View cart:**
+### Preview
 
 ```bash
-foodpanda-cli cart
+foodpanda-pk-cli preview
 ```
 
-Returns the current cart with all items, quantities, prices, fees, and total. Returns `{"message": "Cart is empty."}` if empty.
+Preview requires a saved address in the foodpanda Pakistan account and returns a COD-oriented payment view.
+If a saved-address override is active, preview and order use that address.
 
-**Remove item from cart:**
+### Order
 
 ```bash
-foodpanda-cli remove <cart_item_id>
+foodpanda-pk-cli order --payment payment_on_delivery --confirm
 ```
 
-Remove an item by its `cart_item_id` (e.g., `cart-1`, `cart-2`). These IDs are shown in cart output.
+Live ordering is supported for Cash on Delivery after a successful preview.
+`--confirm` is required because this places a real order.
 
-### Ordering
+## Recommended workflow
 
-**Preview order:**
+1. Set location
+2. Log in
+3. Search restaurants
+4. Browse menu
+5. Build cart
+6. Optionally select a saved address explicitly
+7. Optionally inspect the active address with `address-current`
+8. Run preview
+9. Place the order only after explicit user confirmation with `--confirm`
 
-```bash
-foodpanda-cli preview
-```
+## Important rules
 
-Returns the full order preview: cart contents, selected delivery address, available payment methods, and totals. Always run this before placing an order.
-
-**Place order:**
-
-```bash
-foodpanda-cli order --payment <method> [--instructions <text>]
-```
-
-Places the order. Returns `order_id`, `status`, `estimated_delivery_time`, and `total`.
-
-Currently only `payment_on_delivery` (Cash on Delivery) is supported as the payment method.
-
-## Recommended Workflow
-
-Follow these steps when the user wants to order food:
-
-1. **Check setup** — Ensure location and login are configured. If the user hasn't set these up, run `location` and `login` first.
-2. **Search** — Ask the user what they want to eat, then run `search` to find restaurants.
-3. **Present options** — Show the user matching restaurants with names, cuisines, ratings, and delivery times.
-4. **Browse menu** — Once the user picks a restaurant, run `menu` to see available items.
-5. **Check item details** — If the user wants customizations, run `item` to see available toppings and variations.
-6. **Build cart** — Use `add` to add items. Show the user the cart after each addition.
-7. **Preview** — Run `preview` to show the final order summary with delivery address and total.
-8. **Confirm and order** — ONLY after the user explicitly confirms, run `order --payment payment_on_delivery`.
-
-## Important Rules
-
-- **ALWAYS confirm with the user before running the `order` command.** This places a real order with real money. Never run it without explicit user approval.
-- **Payment:** Only `payment_on_delivery` (Cash on Delivery) works. Do not attempt other payment methods.
-- **Cart switching:** Adding items from a different restaurant clears the existing cart. Warn the user before doing this.
-- **Errors:** All errors are returned as `{"error": "message"}`. If you get an authentication error, prompt the user to run `login` again.
-- **Location required:** All commands except `location` and `login` require a delivery location to be set first.
-- **Philippines only:** This tool only works with foodpanda.ph for delivery addresses in the Philippines.
-
-## Common Patterns
-
-### Filtering by cuisine
-
-```bash
-foodpanda-cli search "pizza" --cuisine "Italian" --limit 5
-```
-
-### Ordering with toppings
-
-1. Get item details to find topping IDs:
-   ```bash
-   foodpanda-cli item p7nl ct-36-pd-1673
-   ```
-2. Add with selected toppings:
-   ```bash
-   foodpanda-cli add p7nl --items '[{"item_id":"ct-36-pd-1673","quantity":1,"topping_ids":["101","205"]}]'
-   ```
-
-### Finding a specific branch of a chain
-
-1. Search returns `chain_code` for chain restaurants
-2. List all branches:
-   ```bash
-   foodpanda-cli outlets cg0ep
-   ```
-3. Pick the closest/preferred branch and use its vendor code for menu and ordering
+- Only Cash on Delivery has been validated for live checkout, and real orders require `--confirm`
+- Use a saved Pakistan delivery address before running `preview`
+- Cart switching still replaces the current cart when a different restaurant is used
+- All errors are returned as JSON
+- Location is required before search/menu/cart/preview flows
+- This tool is Pakistan-specific

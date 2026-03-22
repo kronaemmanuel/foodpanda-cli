@@ -1,8 +1,9 @@
 import { homedir } from "os";
 import { join } from "path";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { APP_DATA_DIR, MARKET_CONFIG } from "./config.js";
 
-const TOKEN_DIR = join(homedir(), ".foodpanda-cli");
+const TOKEN_DIR = join(homedir(), APP_DATA_DIR);
 const TOKEN_FILE = join(TOKEN_DIR, "token.json");
 const BROWSER_DATA_DIR = join(TOKEN_DIR, "browser-data");
 
@@ -84,7 +85,7 @@ export async function refreshTokenViaBrowser(
 
       page.on("request", (request) => {
         const url = request.url();
-        if (!url.includes("ph.fd-api.com")) return;
+        if (!url.includes(MARKET_CONFIG.apiHost)) return;
 
         const authHeader = request.headers()["authorization"];
         if (!authHeader || !authHeader.startsWith("Bearer ")) return;
@@ -99,9 +100,13 @@ export async function refreshTokenViaBrowser(
         resolve(token);
       });
 
-      page.goto("https://www.foodpanda.ph").catch((err) => {
+      page.goto(MARKET_CONFIG.siteUrl).catch((err) => {
         clearTimeout(timer);
-        reject(new Error(`Failed to navigate to foodpanda.ph: ${(err as Error).message}`));
+        reject(
+          new Error(
+            `Failed to navigate to ${MARKET_CONFIG.siteUrl}: ${(err as Error).message}`
+          )
+        );
       });
     });
   } finally {

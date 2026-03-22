@@ -1,18 +1,20 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { APP_DESCRIPTION, APP_NAME } from "./config.js";
 import { registerSearchCommands } from "./commands/search.js";
 import { registerMenuCommands } from "./commands/menu.js";
 import { registerCartCommands } from "./commands/cart.js";
 import { registerOrderCommands } from "./commands/order.js";
 import { registerAuthCommands } from "./commands/auth.js";
 import { registerLocationCommands } from "./commands/location.js";
+import { registerAddressCommands } from "./commands/address.js";
 
 const program = new Command();
 
 program
-  .name("foodpanda-cli")
-  .description("CLI for ordering food from foodpanda.ph — designed for AI assistants")
+  .name(APP_NAME)
+  .description(APP_DESCRIPTION)
   .version("0.1.0");
 
 registerSearchCommands(program);
@@ -21,5 +23,6 @@ registerCartCommands(program);
 registerOrderCommands(program);
 registerAuthCommands(program);
 registerLocationCommands(program);
+registerAddressCommands(program);
 
 program.parse();

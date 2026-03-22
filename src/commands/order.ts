@@ -4,7 +4,7 @@ import { createClient, persistClient } from "../state.js";
 export function registerOrderCommands(program: Command): void {
   program
     .command("preview")
-    .description("Preview order with delivery address and payment methods")
+    .description("Preview order with delivery address and COD payment readiness")
     .action(async () => {
       try {
         const client = createClient();
@@ -19,11 +19,17 @@ export function registerOrderCommands(program: Command): void {
 
   program
     .command("order")
-    .description("Place the current order")
+    .description("Place the current order using Cash on Delivery")
     .requiredOption("--payment <method>", "Payment method name (e.g. payment_on_delivery)")
+    .requiredOption("--confirm", "Explicitly confirm that this should place a real order")
     .option("--instructions <text>", "Delivery instructions")
-    .action(async (opts: { payment: string; instructions?: string }) => {
+    .action(async (opts: { payment: string; confirm?: boolean; instructions?: string }) => {
       try {
+        if (!opts.confirm) {
+          throw new Error(
+            "Real orders require explicit confirmation. Re-run with --confirm."
+          );
+        }
         const client = createClient();
         const result = await client.placeOrder(opts.payment, opts.instructions);
         persistClient(client);

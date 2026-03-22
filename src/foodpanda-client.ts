@@ -17,9 +17,11 @@ import type {
   DeliveryAddress,
   PaymentMethodInfo,
   OrderPreview,
+  SavedAddressSummary,
+  CurrentAddressInfo,
 } from "./types.js";
+import { APP_NAME, MARKET_CONFIG } from "./config.js";
 
-const FOODPANDA_API_BASE = "https://ph.fd-api.com";
 const GRAPHQL_SEARCH_HASH =
   "6d4dea2e0c8ab03c0d2934ca3db20b8914fc17e4109fb103307e4c077ba8506d";
 const GRAPHQL_VENDOR_LIST_HASH =
@@ -124,6 +126,7 @@ export interface SerializedState {
     paymentMethods: PaymentMethodInfo[];
   } | null;
   cachedCustomerProfile: CustomerProfile | null;
+  selectedDeliveryAddressId: number | null;
 }
 
 export class FoodpandaClient {
@@ -145,6 +148,7 @@ export class FoodpandaClient {
   private cartServiceFee: number = 0;
   private cartTotal: number = 0;
   private nextCartItemId: number = 1;
+  private selectedDeliveryAddressId: number | null = null;
 
   // Menu cache keyed by vendor code
   private menuCache: Map<string, CachedVendorMenu> = new Map();
@@ -193,6 +197,18 @@ export class FoodpandaClient {
     this.customerCode = this.extractCustomerCode(token);
   }
 
+  public updateLocation(latitude: number, longitude: number): void {
+    this.latitude = latitude;
+    this.longitude = longitude;
+  }
+
+  public getLocation(): { latitude: number; longitude: number } {
+    return {
+      latitude: this.latitude,
+      longitude: this.longitude,
+    };
+  }
+
   // ----------------------------------------------------------------
   // HTTP helpers
   // ----------------------------------------------------------------
@@ -200,7 +216,7 @@ export class FoodpandaClient {
   private commonHeaders(): Record<string, string> {
     if (!this.sessionToken) {
       throw new Error(
-        "No session token configured. Please call the refresh_token tool to log in."
+        `No session token configured. Run ${APP_NAME} login or set ${APP_NAME}'s session token env var.`
       );
     }
     return {
@@ -218,12 +234,12 @@ export class FoodpandaClient {
     path: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${FOODPANDA_API_BASE}${path}`;
+    const url = `${MARKET_CONFIG.apiBaseUrl}${path}`;
     const response = await fetch(url, {
       ...options,
       headers: {
         ...this.commonHeaders(),
-        "x-pd-language-id": "1",
+        "x-pd-language-id": String(MARKET_CONFIG.languageId),
         "Content-Type": "application/json",
         ...((options.headers as Record<string, string>) || {}),
       },
@@ -231,7 +247,7 @@ export class FoodpandaClient {
 
     if (response.status === 401 || response.status === 403) {
       throw new Error(
-        "Session token expired or invalid. Please call the refresh_token tool to log in again."
+        `Session token expired or invalid. Run ${APP_NAME} login again.`
       );
     }
     if (!response.ok) {
@@ -244,7 +260,7 @@ export class FoodpandaClient {
   }
 
   private async graphqlRequest<T>(body: object, displayContext: string = "SEARCH"): Promise<T> {
-    const url = `${FOODPANDA_API_BASE}/graphql`;
+    const url = `${MARKET_CONFIG.apiBaseUrl}/graphql`;
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -255,14 +271,14 @@ export class FoodpandaClient {
         "customer-longitude": String(this.longitude),
         "display-context": displayContext,
         platform: "web",
-        locale: "en_PH",
+        locale: MARKET_CONFIG.locale,
       },
       body: JSON.stringify(body),
     });
 
     if (response.status === 401 || response.status === 403) {
       throw new Error(
-        "Session token expired or invalid. Please call the refresh_token tool to log in again."
+        `Session token expired or invalid. Run ${APP_NAME} login again.`
       );
     }
     if (!response.ok) {
@@ -295,8 +311,8 @@ export class FoodpandaClient {
           query,
           latitude: this.latitude,
           longitude: this.longitude,
-          locale: "en_PH",
-          languageId: 1,
+          locale: MARKET_CONFIG.locale,
+          languageId: MARKET_CONFIG.languageId,
           expeditionType: "DELIVERY",
           customerType: "B2C",
           verticalTypes: ["RESTAURANTS"],
@@ -436,9 +452,9 @@ export class FoodpandaClient {
           expeditionType: "DELIVERY",
           latitude: this.latitude,
           longitude: this.longitude,
-          locale: "en_PH",
+          locale: MARKET_CONFIG.locale,
           customerType: "B2C",
-          languageId: 1,
+          languageId: MARKET_CONFIG.languageId,
           page: "CHAIN_LISTING_PAGE",
           availabilityFilters: {
             chainCodes: [chainCode],
@@ -547,7 +563,7 @@ export class FoodpandaClient {
     const path =
       `/api/v5/vendors/${encodeURIComponent(vendorCode)}` +
       `?include=menus,bundles,multiple_discounts` +
-      `&language_id=1&opening_type=delivery&basket_currency=PHP` +
+      `&language_id=${MARKET_CONFIG.languageId}&opening_type=delivery&basket_currency=${MARKET_CONFIG.currency}` +
       `&latitude=${this.latitude}&longitude=${this.longitude}`;
 
     interface VendorResponse {
@@ -634,7 +650,7 @@ export class FoodpandaClient {
     const path =
       `/api/v5/vendors/${encodeURIComponent(vendorCode)}` +
       `?include=menus,bundles,multiple_discounts` +
-      `&language_id=1&opening_type=delivery&basket_currency=PHP` +
+      `&language_id=${MARKET_CONFIG.languageId}&opening_type=delivery&basket_currency=${MARKET_CONFIG.currency}` +
       `&latitude=${this.latitude}&longitude=${this.longitude}`;
 
     interface VendorMenuResponse {
@@ -961,6 +977,86 @@ export class FoodpandaClient {
     return result.data.items;
   }
 
+  async listSavedAddresses(): Promise<SavedAddressSummary[]> {
+    const addresses = await this.getDeliveryAddresses();
+
+    return addresses.map((address) => ({
+      id: address.id,
+      label: address.label,
+      formatted_address:
+        address.formatted_customer_address ||
+        address.formatted_address ||
+        address.address_line1,
+      city: address.city_name || address.city || "",
+      latitude: address.latitude,
+      longitude: address.longitude,
+      delivery_instructions: address.delivery_instructions,
+      is_delivery_available: address.is_delivery_available,
+      selected: this.selectedDeliveryAddressId === address.id,
+    }));
+  }
+
+  async selectDeliveryAddress(addressId: number): Promise<SavedAddressSummary> {
+    const addresses = await this.getDeliveryAddresses();
+    const address = addresses.find((item) => item.id === addressId);
+
+    if (!address) {
+      throw new Error(
+        `Saved address "${addressId}" not found. Run \`${APP_NAME} addresses\` to see available address IDs.`
+      );
+    }
+
+    this.selectedDeliveryAddressId = address.id;
+
+    return {
+      id: address.id,
+      label: address.label,
+      formatted_address:
+        address.formatted_customer_address ||
+        address.formatted_address ||
+        address.address_line1,
+      city: address.city_name || address.city || "",
+      latitude: address.latitude,
+      longitude: address.longitude,
+      delivery_instructions: address.delivery_instructions,
+      is_delivery_available: address.is_delivery_available,
+      selected: true,
+    };
+  }
+
+  public clearSelectedDeliveryAddress(): void {
+    this.selectedDeliveryAddressId = null;
+  }
+
+  async getCurrentAddressInfo(): Promise<CurrentAddressInfo> {
+    const addresses = await this.getDeliveryAddresses();
+    const address =
+      addresses.length > 0 ? this.pickDeliveryAddress(addresses) : null;
+
+    return {
+      selection_mode:
+        this.selectedDeliveryAddressId === null ? "nearest" : "selected",
+      selected_address_id: this.selectedDeliveryAddressId,
+      location: this.getLocation(),
+      address: address
+        ? {
+            id: address.id,
+            label: address.label,
+            formatted_address:
+              address.formatted_customer_address ||
+              address.formatted_address ||
+              address.address_line1,
+            city: address.city_name || address.city || "",
+            latitude: address.latitude,
+            longitude: address.longitude,
+            delivery_instructions: address.delivery_instructions,
+            is_delivery_available: address.is_delivery_available,
+            selected: this.selectedDeliveryAddressId === address.id,
+          }
+        : null,
+    };
+  }
+
   /**
    * Pick the best delivery address: closest to configured lat/lng.
    */
@@ -970,6 +1066,21 @@ export class FoodpandaClient {
         "No saved delivery addresses found. Please add an address in the foodpanda app first."
       );
     }
+
+    if (this.selectedDeliveryAddressId !== null) {
+      const selectedAddress = addresses.find(
+        (address) => address.id === this.selectedDeliveryAddressId
+      );
+
+      if (!selectedAddress) {
+        throw new Error(
+          `Selected saved address "${this.selectedDeliveryAddressId}" was not found. Run \`${APP_NAME} addresses\` and select a valid address again.`
+        );
+      }
+
+      return selectedAddress;
+    }
+
     if (addresses.length === 1) return addresses[0];
 
     let best = addresses[0];
@@ -1021,12 +1132,12 @@ export class FoodpandaClient {
     }
 
     const result = await this.restRequest<IntentResponse>(
-      "/api/v5/purchase/intent?include=cashback&locale=en_PH",
+      `/api/v5/purchase/intent?include=cashback&locale=${MARKET_CONFIG.locale}`,
       {
         method: "POST",
         body: JSON.stringify({
           subtotal,
-          currency: "PHP",
+          currency: MARKET_CONFIG.currency,
           vendorCode,
           amount: total,
           emoneyAmountToUse: 0,
@@ -1043,45 +1154,19 @@ export class FoodpandaClient {
     const methods: PaymentMethodInfo[] = [];
 
     for (const pm of result.data.paymentMethodDetails.paymentMethods) {
-      if (pm.hidden) continue;
+      if (
+        pm.hidden ||
+        !MARKET_CONFIG.supportedPreviewPaymentMethodNames.includes(pm.name)
+      ) {
+        continue;
+      }
 
-      if (pm.name === "payment_on_delivery") {
+      if (pm.name === MARKET_CONFIG.cashOnDeliveryMethod) {
         const instrument = pm.paymentInstruments?.[0];
         methods.push({
-          name: "payment_on_delivery",
+          name: MARKET_CONFIG.cashOnDeliveryMethod,
           display_name: "Cash on Delivery",
           instrument_id: instrument?.publicId ?? null,
-        });
-      } else if (pm.name === "generic_creditcard") {
-        // List each saved card as a separate option
-        if (pm.paymentInstruments && pm.paymentInstruments.length > 0) {
-          for (const inst of pm.paymentInstruments) {
-            const pf = inst.publicFields;
-            const label = pf?.scheme && pf?.displayValue
-              ? `${pf.scheme} ending ${pf.displayValue}`
-              : "Saved card";
-            methods.push({
-              name: "generic_creditcard",
-              display_name: label,
-              instrument_id: inst.publicId,
-              card_details: pf
-                ? {
-                    scheme: pf.scheme ?? "",
-                    last_4_digits: pf.displayValue ?? "",
-                    bin: pf.bin ?? "",
-                    owner: pf.owner ?? "",
-                    valid_to_month: pf.validToMonth ?? 0,
-                    valid_to_year: pf.validToYear ?? 0,
-                  }
-                : undefined,
-            });
-          }
-        }
-      } else if (pm.name === "antfinancial_gcash") {
-        methods.push({
-          name: "antfinancial_gcash",
-          display_name: "GCash (requires app redirect — may not work via MCP)",
-          instrument_id: null,
         });
       }
     }
@@ -1152,113 +1237,100 @@ export class FoodpandaClient {
   ): Promise<OrderResult> {
     if (!this.checkoutState) {
       throw new Error(
-        "No order preview found. Call preview_order first to prepare checkout."
+        "No order preview found. Run preview before placing an order."
       );
     }
     if (this.cartProducts.length === 0 || !this.cartVendor) {
       throw new Error("Cart is empty.");
     }
 
-    // Re-calculate cart to ensure product data is fresh and matches server state
     await this.calculateCart();
 
     const { customer, address, purchaseIntentId, paymentMethods } =
       this.checkoutState;
 
-    // Find the selected payment method
     const selectedMethod = paymentMethods.find(
-      (m) => m.name === paymentMethodName
+      (method) => method.name === paymentMethodName
     );
     if (!selectedMethod) {
-      const available = paymentMethods.map((m) => m.name).join(", ");
+      const available = paymentMethods.map((method) => method.name).join(", ");
       throw new Error(
         `Payment method "${paymentMethodName}" not available. Available: ${available}`
       );
     }
 
-    // Build payment methods array for checkout
-    const paymentMethodsPayload: Array<{
-      amount: number;
-      metadata: Record<string, unknown>;
-      method: string;
-    }> = [];
-
-    if (selectedMethod.name === "generic_creditcard") {
+    if (selectedMethod.name !== MARKET_CONFIG.cashOnDeliveryMethod) {
       throw new Error(
-        "Credit card payments are not supported via MCP. Foodpanda requires a browser-based payment flow (Adyen SDK) to authorize credit card charges, which cannot be completed through API calls alone. Please use 'payment_on_delivery' (Cash on Delivery) instead."
+        `Only ${MARKET_CONFIG.cashOnDeliveryMethod} is currently supported for live checkout in this CLI.`
       );
-    } else if (selectedMethod.name === "payment_on_delivery") {
-      paymentMethodsPayload.push({
+    }
+
+    const paymentMethodsPayload = [
+      {
         amount: this.cartTotal,
         metadata: {
           token: selectedMethod.instrument_id,
         },
-        method: "payment_on_delivery",
-      });
-    } else {
-      throw new Error(
-        `Payment method "${selectedMethod.name}" is not supported for automated checkout. Use "payment_on_delivery" or "generic_creditcard".`
-      );
-    }
+        method: MARKET_CONFIG.cashOnDeliveryMethod,
+      },
+    ];
 
-    // Build checkout product payloads (more verbose than cart/calculate)
     const cached = this.menuCache.get(this.cartVendor.code);
-    const checkoutProducts = this.cartProducts.map((p) => {
-      const menuItem = cached?.productsById.get(p.id);
+    const checkoutProducts = this.cartProducts.map((product) => {
+      const menuItem = cached?.productsById.get(product.id);
       return {
         description: menuItem?.description ?? "",
         priceBeforeDiscount: null,
-        name: menuItem?.name ?? p.variation_name,
-        vat_percentage: p.vat_percentage,
+        name: menuItem?.name ?? product.variation_name,
+        vat_percentage: product.vat_percentage,
         discount: null,
-        special_instructions: p.special_instructions,
+        special_instructions: product.special_instructions,
         variation_name: "",
-        sold_out_option: p.sold_out_option,
-        toppings: p.toppings,
-        price: p.price,
-        packaging_price: p.packaging_charge,
-        original_price: p.original_price,
-        quantity: p.quantity,
+        sold_out_option: product.sold_out_option,
+        toppings: product.toppings,
+        price: product.price,
+        packaging_price: product.packaging_charge,
+        original_price: product.original_price,
+        quantity: product.quantity,
         quantity_auto_added: 0,
-        id: p.id,
-        variation_id: p.variation_id,
+        id: product.id,
+        variation_id: product.variation_id,
         is_available: true,
         is_alcoholic_item: false,
-        total_price: p.price * p.quantity,
-        total_price_before_discount: p.price * p.quantity,
+        total_price: product.price * product.quantity,
+        total_price_before_discount: product.price * product.quantity,
         products: [],
-        product_variation_id: p.variation_id,
-        product_id: p.id,
+        product_variation_id: product.variation_id,
+        product_id: product.id,
         sold_out_options: [
           { default: true, option: "REFUND", text: "NEXTGEN_SoldOutOptions_Refund" },
           { default: false, option: "CALL_CUSTOMER", text: "NEXTGEN_SoldOutOptions_CALL_CUSTOMER" },
         ],
         product_variations: [
           {
-            id: p.variation_id,
-            code: p.variation_code,
-            remote_code: p.variation_code,
+            id: product.variation_id,
+            code: product.variation_code,
+            remote_code: product.variation_code,
             container_price: 0,
-            price: p.price,
-            topping_ids: p.toppings.map((t) => t.id),
+            price: product.price,
+            topping_ids: product.toppings.map((topping) => topping.id),
             topping_properties: [],
             unit_pricing: null,
             total_price: 0,
             dietary_attributes: {},
           },
         ],
-        code: p.code,
-        variation_code: p.variation_code,
+        code: product.code,
+        variation_code: product.variation_code,
         is_bundle: false,
         tags: [],
         imageUrl: menuItem?.image_url ?? "",
-        initial_price: p.price,
-        initial_original_price: p.original_price,
+        initial_price: product.price,
+        initial_original_price: product.original_price,
         product_type: "",
       };
     });
 
-    // Build dps-session-id header
     const dpsPayload = {
       session_id: Array.from({ length: 32 }, () =>
         Math.floor(Math.random() * 16).toString(16)
@@ -1268,7 +1340,6 @@ export class FoodpandaClient {
     };
     const dpsSessionId = Buffer.from(JSON.stringify(dpsPayload)).toString("base64");
 
-    // Build the full checkout body
     const checkoutBody = {
       platform: "b2c",
       expected_total_amount: this.cartTotal,
@@ -1298,9 +1369,9 @@ export class FoodpandaClient {
       vendor: this.cartVendor,
       products: checkoutProducts,
       payment: {
-        client_redirect_url: "https://www.foodpanda.ph/payments/handle-payment/",
+        client_redirect_url: MARKET_CONFIG.paymentRedirectUrl,
         purchase_intent_id: purchaseIntentId,
-        currency: "PHP",
+        currency: MARKET_CONFIG.currency,
         methods: paymentMethodsPayload,
       },
       voucher: "",
@@ -1354,18 +1425,16 @@ export class FoodpandaClient {
         headers: {
           "dps-session-id": dpsSessionId,
           "x-caller-platform": "mfe",
-          "x-global-entity-id": "FP_PH",
+          "x-global-entity-id": MARKET_CONFIG.globalEntityId,
         },
       }
     );
 
-    // Log raw response for debugging
     console.error("[placeOrder] checkout response:", JSON.stringify(result, null, 2));
 
-    // Check for error indicators in the response body
     if (result.errors && result.errors.length > 0) {
       const messages = result.errors
-        .map((e) => e.message || e.code || "unknown error")
+        .map((error) => error.message || error.code || "unknown error")
         .join("; ");
       throw new Error(`Checkout failed: ${messages}`);
     }
@@ -1376,14 +1445,12 @@ export class FoodpandaClient {
       throw new Error(`Checkout failed: ${result.message}`);
     }
 
-    // Handle redirect_url (e.g. 3DS authentication for credit cards)
     if (result.redirect_url) {
       throw new Error(
         `Payment requires browser authentication. Please complete payment at: ${result.redirect_url}`
       );
     }
 
-    // Extract order code — the API returns it as `id` at the top level
     const orderCode =
       result.id ??
       result.order?.code ??
@@ -1397,11 +1464,10 @@ export class FoodpandaClient {
     if (!orderCode) {
       console.error("[placeOrder] no order code found in response:", JSON.stringify(result));
       throw new Error(
-        "Order may not have been placed — no order code in response. Check your foodpanda app/website to confirm. Raw response logged to server stderr."
+        "Order may not have been placed: no order code was returned. Check your foodpanda app or website to confirm."
       );
     }
 
-    // Extract status from payment result or top-level status
     const status =
       result.payment?.result ??
       result.order?.status ??
@@ -1409,16 +1475,12 @@ export class FoodpandaClient {
       result.data?.status ??
       "placed";
 
-    // Capture total before clearing cart
     const finalTotal = checkoutBody.expected_total_amount;
-
-    // Derive estimated delivery time from available response fields
     const deliveryMinutes = result.expedition?.expected_delivery_duration ?? 0;
     const estimatedDelivery =
       result.order?.estimated_delivery_time ??
       (deliveryMinutes > 0 ? `${deliveryMinutes} min` : "");
 
-    // Only clear cart after confirmed successful order
     this.clearCart();
     this.checkoutState = null;
 
@@ -1601,6 +1663,7 @@ export class FoodpandaClient {
       menuCache: menuEntries,
       checkoutState: this.checkoutState,
       cachedCustomerProfile: this.cachedCustomerProfile,
+      selectedDeliveryAddressId: this.selectedDeliveryAddressId,
     };
   }
 
@@ -1618,6 +1681,7 @@ export class FoodpandaClient {
     this.nextCartItemId = state.nextCartItemId;
     this.checkoutState = state.checkoutState;
     this.cachedCustomerProfile = state.cachedCustomerProfile;
+    this.selectedDeliveryAddressId = state.selectedDeliveryAddressId ?? null;
 
     // Rebuild Maps from serialized arrays
     this.menuCache = new Map();

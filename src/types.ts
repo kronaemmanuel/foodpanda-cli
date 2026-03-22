@@ -174,8 +174,30 @@ export interface DeliveryAddress {
   entrance_longitude: number | null;
 }
 
+export interface SavedAddressSummary {
+  id: number;
+  label: string | null;
+  formatted_address: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  delivery_instructions: string;
+  is_delivery_available: boolean;
+  selected: boolean;
+}
+
+export interface CurrentAddressInfo {
+  selection_mode: "selected" | "nearest";
+  selected_address_id: number | null;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  address: SavedAddressSummary | null;
+}
+
 export interface PaymentMethodInfo {
-  name: string; // e.g. "payment_on_delivery", "generic_creditcard"
+  name: string; // e.g. "payment_on_delivery"
   display_name: string; // e.g. "Cash on Delivery", "Mastercard ending 0004"
   instrument_id: string | null; // publicId for saved instruments
   /** For saved credit cards: card details needed for checkout payload */
