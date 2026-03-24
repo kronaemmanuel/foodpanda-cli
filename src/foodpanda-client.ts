@@ -21,6 +21,7 @@ import type {
   CurrentAddressInfo,
 } from "./types.js";
 import { APP_NAME, MARKET_CONFIG } from "./config.js";
+import { requestJsonViaBrowser } from "./token-manager.js";
 
 const GRAPHQL_SEARCH_HASH =
   "6d4dea2e0c8ab03c0d2934ca3db20b8914fc17e4109fb103307e4c077ba8506d";
@@ -209,6 +210,18 @@ export class FoodpandaClient {
     };
   }
 
+  private createDpsSessionId(): string {
+    const dpsPayload = {
+      session_id: Array.from({ length: 32 }, () =>
+        Math.floor(Math.random() * 16).toString(16)
+      ).join(""),
+      perseus_id: this.perseusClientId,
+      timestamp: Math.floor(Date.now() / 1000),
+    };
+
+    return Buffer.from(JSON.stringify(dpsPayload)).toString("base64");
+  }
+
   // ----------------------------------------------------------------
   // HTTP helpers
   // ----------------------------------------------------------------
@@ -236,10 +249,14 @@ export class FoodpandaClient {
   ): Promise<T> {
     const url = `${MARKET_CONFIG.apiBaseUrl}${path}`;
     const locationHeaders: Record<string, string> = {
+      "api-version": "7",
       "customer-latitude": String(this.latitude),
       "customer-longitude": String(this.longitude),
       locale: MARKET_CONFIG.locale,
+      origin: MARKET_CONFIG.siteUrl,
       platform: "web",
+      referer: `${MARKET_CONFIG.siteUrl}/`,
+      "dps-session-id": this.createDpsSessionId(),
       "x-global-entity-id": MARKET_CONFIG.globalEntityId,
     };
 
@@ -247,19 +264,44 @@ export class FoodpandaClient {
       locationHeaders["customer-code"] = this.customerCode;
     }
 
+    const headers = {
+      ...this.commonHeaders(),
+      "x-pd-language-id": String(MARKET_CONFIG.languageId),
+      "Content-Type": "application/json",
+      ...locationHeaders,
+      ...((options.headers as Record<string, string>) || {}),
+    };
+
     const response = await fetch(url, {
       ...options,
-      headers: {
-        ...this.commonHeaders(),
-        "x-pd-language-id": String(MARKET_CONFIG.languageId),
-        "Content-Type": "application/json",
-        ...locationHeaders,
-        ...((options.headers as Record<string, string>) || {}),
-      },
+      headers,
     });
 
     if (response.status === 401 || response.status === 403) {
       const body = await response.text().catch(() => "");
+
+      if (path.startsWith("/api/v5/vendors/")) {
+        const browserResult = await requestJsonViaBrowser({
+          path,
+          method:
+            typeof options.method === "string" && options.method.length > 0
+              ? options.method
+              : "GET",
+          headers,
+          body: typeof options.body === "string" ? options.body : undefined,
+        });
+
+        if (browserResult.ok) {
+          return JSON.parse(browserResult.bodyText) as T;
+        }
+
+        throw new Error(
+          `Foodpanda vendor request failed (${browserResult.status}) for ${path} after browser fallback: ${
+            browserResult.bodyText.slice(0, 300) || "no response body"
+          }`
+        );
+      }
+
       throw new Error(
         `Foodpanda REST request failed (${response.status}) for ${path}: ${
           body.slice(0, 300) || "no response body"
@@ -1347,14 +1389,7 @@ export class FoodpandaClient {
       };
     });
 
-    const dpsPayload = {
-      session_id: Array.from({ length: 32 }, () =>
-        Math.floor(Math.random() * 16).toString(16)
-      ).join(""),
-      perseus_id: this.perseusClientId,
-      timestamp: Math.floor(Date.now() / 1000),
-    };
-    const dpsSessionId = Buffer.from(JSON.stringify(dpsPayload)).toString("base64");
+    const dpsSessionId = this.createDpsSessionId();
 
     const checkoutBody = {
       platform: "b2c",

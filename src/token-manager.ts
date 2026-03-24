@@ -97,6 +97,54 @@ interface RefreshTokenViaBrowserOptions {
   operationLabel?: string;
 }
 
+interface BrowserJsonRequestOptions {
+  path: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  timeoutSeconds?: number;
+  headless?: boolean;
+}
+
+interface BrowserJsonResponse {
+  ok: boolean;
+  status: number;
+  bodyText: string;
+}
+
+async function getStealthChromium(): Promise<
+  Awaited<typeof import("playwright-extra")>["chromium"]
+> {
+  try {
+    const pw = await import("playwright-extra");
+    const stealthModule = await import("puppeteer-extra-plugin-stealth");
+    const StealthPlugin = stealthModule.default;
+    const chromium = pw.chromium;
+    chromium.use(StealthPlugin());
+    return chromium;
+  } catch {
+    throw new Error(
+      "Playwright is not installed. Run: npm install playwright-extra puppeteer-extra-plugin-stealth"
+    );
+  }
+}
+
+async function launchPersistentBrowser(headless: boolean) {
+  const chromium = await getStealthChromium();
+
+  mkdirSync(BROWSER_DATA_DIR, { recursive: true, mode: 0o700 });
+
+  try {
+    return await chromium.launchPersistentContext(BROWSER_DATA_DIR, {
+      headless,
+    });
+  } catch (err) {
+    throw new Error(
+      `Failed to launch browser. Run: npx playwright install chromium\n${(err as Error).message}`
+    );
+  }
+}
+
 export async function refreshTokenViaBrowser(
   options: RefreshTokenViaBrowserOptions = {}
 ): Promise<string> {
@@ -106,35 +154,13 @@ export async function refreshTokenViaBrowser(
     operationLabel = headless ? "Auth refresh" : "Login",
   } = options;
 
-  // Use playwright-extra with stealth plugin to avoid bot detection.
-  // This patches navigator.webdriver, Chrome automation signals, and other
-  // fingerprinting vectors that Google OAuth and foodpanda use to block bots.
-  let chromium: Awaited<typeof import("playwright-extra")>["chromium"];
-  try {
-    const pw = await import("playwright-extra");
-    const stealthModule = await import("puppeteer-extra-plugin-stealth");
-    const StealthPlugin = stealthModule.default;
-    chromium = pw.chromium;
-    chromium.use(StealthPlugin());
-  } catch {
-    throw new Error(
-      "Playwright is not installed. Run: npm install playwright-extra puppeteer-extra-plugin-stealth"
-    );
-  }
-
-  // Persistent context preserves cookies across refreshes so the user
-  // may already be logged in from a previous session.
-  mkdirSync(BROWSER_DATA_DIR, { recursive: true, mode: 0o700 });
-
   let context;
   try {
-    context = await chromium.launchPersistentContext(BROWSER_DATA_DIR, {
-      headless,
-    });
+    // Persistent context preserves cookies across refreshes so the user
+    // may already be logged in from a previous session.
+    context = await launchPersistentBrowser(headless);
   } catch (err) {
-    throw new Error(
-      `Failed to launch browser. Run: npx playwright install chromium\n${(err as Error).message}`
-    );
+    throw err;
   }
 
   try {
@@ -190,4 +216,73 @@ export async function refreshAndPersistTokenViaBrowser(
   const token = await refreshTokenViaBrowser(options);
   persistToken(token);
   return token;
+}
+
+export async function requestJsonViaBrowser(
+  options: BrowserJsonRequestOptions
+): Promise<BrowserJsonResponse> {
+  const {
+    path,
+    method = "GET",
+    headers = {},
+    body,
+    timeoutSeconds = 30,
+    headless = true,
+  } = options;
+
+  const context = await launchPersistentBrowser(headless);
+
+  try {
+    const page = context.pages()[0] || (await context.newPage());
+    await page.goto(MARKET_CONFIG.siteUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: timeoutSeconds * 1000,
+    });
+
+    return await page.evaluate(
+      async ({
+        url,
+        method,
+        headers,
+        body,
+        timeoutMs,
+      }: {
+        url: string;
+        method: string;
+        headers: Record<string, string>;
+        body?: string;
+        timeoutMs: number;
+      }) => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+          const response = await fetch(url, {
+            method,
+            headers,
+            body,
+            credentials: "include",
+            signal: controller.signal,
+          });
+
+          return {
+            ok: response.ok,
+            status: response.status,
+            bodyText: await response.text(),
+          };
+        } finally {
+          clearTimeout(timer);
+        }
+      },
+      {
+        url: `${MARKET_CONFIG.apiBaseUrl}${path}`,
+        method,
+        headers,
+        body,
+        timeoutMs: timeoutSeconds * 1000,
+      }
+    );
+  } finally {
+    await context.close().catch(() => {});
+  }
 }
