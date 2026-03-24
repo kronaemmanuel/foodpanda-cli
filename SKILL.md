@@ -35,21 +35,7 @@ foodpanda-pk-cli --version
 
 Before using any other commands, complete these two setup steps.
 
-### 1. Set delivery location
-
-Provide the user's delivery coordinates in Pakistan:
-
-```bash
-foodpanda-pk-cli location <latitude> <longitude>
-```
-
-Multan example:
-
-```bash
-foodpanda-pk-cli location 30.2088719 71.4886923
-```
-
-### 2. Log in
+### 1. Log in
 
 Opens a browser window for the user to log in to foodpanda Pakistan. The session token is captured automatically.
 
@@ -68,6 +54,23 @@ Fallback:
 ```bash
 $env:FOODPANDA_PK_SESSION_TOKEN = "your-session-token"
 ```
+
+### 2. Select a saved address
+
+```bash
+foodpanda-pk-cli addresses
+foodpanda-pk-cli address-use <address_id>
+```
+
+`address-use` is the normal way to initialize location for this CLI. It selects one saved address and syncs the CLI location to that address automatically.
+
+### Optional manual location override
+
+```bash
+foodpanda-pk-cli location <latitude> <longitude>
+```
+
+You usually do not need to set location manually unless you specifically want nearest-address fallback behavior without an explicit saved-address selection.
 
 ## Command reference
 
@@ -129,13 +132,13 @@ Live ordering is supported for Cash on Delivery after a successful preview.
 
 ## Recommended workflow
 
-1. Set location
-2. Log in
-3. Search restaurants
-4. Browse menu
-5. Build cart
-6. Optionally select a saved address explicitly
-7. Optionally inspect the active address with `address-current`
+1. Log in
+2. List saved addresses
+3. Select the saved address you want to use
+4. Optionally inspect the active address with `address-current`
+5. Search restaurants
+6. Browse menu
+7. Build cart
 8. Run preview
 9. Place the order only after explicit user confirmation with `--confirm`
 
@@ -145,5 +148,5 @@ Live ordering is supported for Cash on Delivery after a successful preview.
 - Use a saved Pakistan delivery address before running `preview`
 - Cart switching still replaces the current cart when a different restaurant is used
 - All errors are returned as JSON
-- Location is required before search/menu/cart/preview flows
+- Location is normally derived from the selected saved address; manual `location` is optional fallback behavior
 - This tool is Pakistan-specific

@@ -8,7 +8,7 @@ All command output is JSON.
 
 Supported in this fork:
 - Pakistan login flow
-- Delivery location setup
+- Saved-address-driven location sync
 - Restaurant search and discovery
 - Restaurant details and menu browsing
 - Saved-address listing and explicit address selection
@@ -37,23 +37,41 @@ npm install -g .
 foodpanda-pk-cli --help
 ```
 
-## Initial Setup
+## OpenClaw Skill
 
-### 1. Set your location
+This repo now includes an OpenClaw-compatible skill at:
 
-Use your delivery coordinates in Pakistan.
-
-```bash
-foodpanda-pk-cli location 30.2088719 71.4886923
+```text
+skills/foodpanda-pk-cli/
 ```
 
-The default examples in this repo use Multan:
-- Latitude: `30.2088719`
-- Longitude: `71.4886923`
+You can use it in OpenClaw in either of these ways:
 
-Location is stored in `~/.foodpanda-pk-cli/location.json`.
+1. Put or copy the skill folder into an OpenClaw skill directory:
+   - `<workspace>/skills/foodpanda-pk-cli`
+   - `~/.openclaw/skills/foodpanda-pk-cli`
+2. Or point OpenClaw at this repo's `skills/` directory through `~/.openclaw/openclaw.json`:
 
-### 2. Log in
+```json5
+{
+  skills: {
+    load: {
+      extraDirs: ["D:/dev/foodpanda-cli/skills"]
+    }
+  }
+}
+```
+
+The OpenClaw skill uses the repo-local CLI via `node build/cli.js ...`, so the repo should still be built with:
+
+```bash
+npm install
+npm run build
+```
+
+## Initial Setup
+
+### 1. Log in
 
 ```bash
 foodpanda-pk-cli login
@@ -66,6 +84,25 @@ If browser capture does not work, set the session token manually through the env
 ```bash
 $env:FOODPANDA_PK_SESSION_TOKEN = "your-session-token"
 ```
+
+### 2. Select a saved address
+
+```bash
+foodpanda-pk-cli addresses
+foodpanda-pk-cli address-use <address_id>
+```
+
+`address-use` is the normal way to initialize location for the CLI. It selects one of your saved foodpanda Pakistan addresses and syncs the CLI location to that address automatically.
+
+Location is stored in `~/.foodpanda-pk-cli/location.json` after address selection.
+
+### Optional manual location override
+
+```bash
+foodpanda-pk-cli location <latitude> <longitude>
+```
+
+You usually do not need this. It is only useful if you want nearest-address fallback behavior without selecting an explicit saved address first.
 
 Token, browser data, and cached state are stored under `~/.foodpanda-pk-cli/`.
 
@@ -112,7 +149,7 @@ foodpanda-pk-cli address-current
 
 `address-use` pins preview/order to a specific saved address ID and also updates the CLI location to that address's coordinates automatically.
 
-`address-auto` clears the override and returns to nearest-address selection based on your configured `location`.
+`address-auto` clears the override and returns to nearest-address selection based on the currently synced `location`.
 
 `address-current` shows the active selection mode, the current synced location, and the address that preview/order will use.
 
@@ -141,32 +178,31 @@ Live ordering is currently supported only for `payment_on_delivery` after a succ
 
 ## Recommended Workflow
 
-1. Set location in Pakistan.
-2. Run `login`.
-3. Search restaurants.
-4. Inspect a restaurant and browse its menu.
-5. Add items to cart.
-6. Optionally run `addresses` and `address-use <address_id>` if you want a specific saved address; this also syncs the CLI location to that address.
-7. Optionally run `address-current` to verify the active address and location state.
+1. Run `login`.
+2. Run `addresses`.
+3. Run `address-use <address_id>` to select the saved address you want to use; this syncs the CLI location automatically.
+4. Optionally run `address-current` to verify the active address and location state.
+5. Search restaurants.
+6. Inspect a restaurant and browse its menu.
+7. Add items to cart.
 8. Run `preview`.
 9. If the user confirms, place the order with Cash on Delivery using `--confirm`.
 
 ## Suggested Live Smoke Test
 
-Suggested live smoke test in Multan:
+Suggested live smoke test using a saved Multan address:
 
-1. `foodpanda-pk-cli location 30.2088719 71.4886923`
-2. `foodpanda-pk-cli login`
-3. `foodpanda-pk-cli search "biryani" --limit 5`
-4. `foodpanda-pk-cli restaurant <vendor_code>`
-5. `foodpanda-pk-cli menu <vendor_code>`
-6. `foodpanda-pk-cli add <vendor_code> --items '[{"item_id":"product-code","quantity":1}]'`
-7. `foodpanda-pk-cli cart`
-8. `foodpanda-pk-cli addresses`
-9. `foodpanda-pk-cli address-use <address_id>`
-10. `foodpanda-pk-cli address-current`
-11. `foodpanda-pk-cli preview`
-12. `foodpanda-pk-cli order --payment payment_on_delivery --confirm`
+1. `foodpanda-pk-cli login`
+2. `foodpanda-pk-cli addresses`
+3. `foodpanda-pk-cli address-use <address_id>`
+4. `foodpanda-pk-cli address-current`
+5. `foodpanda-pk-cli search "biryani" --limit 5`
+6. `foodpanda-pk-cli restaurant <vendor_code>`
+7. `foodpanda-pk-cli menu <vendor_code>`
+8. `foodpanda-pk-cli add <vendor_code> --item-id product-code --quantity 1`
+9. `foodpanda-pk-cli cart`
+10. `foodpanda-pk-cli preview`
+11. `foodpanda-pk-cli order --payment payment_on_delivery --confirm`
 
 ## Limitations
 
