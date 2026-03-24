@@ -92,6 +92,13 @@ If the token expires later, refresh it without changing your workflow:
 foodpanda-pk-cli auth-refresh
 ```
 
+`auth-refresh` now uses headless Chromium by default so it can silently refresh from the CLI's persisted browser cookies when that session is still valid.
+If silent refresh fails because the browser session is no longer logged in, run a visible login again:
+
+```bash
+foodpanda-pk-cli login
+```
+
 If browser capture does not work, set the session token manually through the environment:
 
 ```bash
@@ -176,7 +183,8 @@ foodpanda-pk-cli auth-refresh
 
 `auth-status` shows whether auth is coming from the environment or the persisted token cache, whether the CLI browser profile exists, and whether location is configured.
 
-`auth-refresh` reopens the CLI's persistent browser profile and captures a fresh token. This is the normal recovery path when the cached JWT expires.
+`auth-refresh` launches the CLI's persistent browser profile in headless mode and captures a fresh token. This is the normal recovery path when the cached JWT expires but the stored browser session is still valid.
+Use `foodpanda-pk-cli auth-refresh --headed` if you want to debug or the site requires visible interaction.
 
 ### Preview
 
@@ -235,7 +243,7 @@ Suggested live smoke test using a saved Multan address:
 
 - Pakistan market assumptions are centralized, but some internal API details are still reverse-engineered rather than officially documented
 - Live checkout has only been validated for Cash on Delivery
-- Session tokens expire; the intended recovery path is `auth-refresh`, which reuses the CLI's own persistent browser profile
+- Session tokens expire; the intended recovery path is `auth-refresh`, which reuses the CLI's own persistent browser profile in headless mode when the saved browser session is still valid
 - The CLI does not directly read from OpenClaw's managed Chrome profile; its auth cache is separate under `~/.foodpanda-pk-cli/browser-data`
 - The repo is restaurant-focused only
 

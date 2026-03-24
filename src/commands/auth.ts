@@ -9,8 +9,12 @@ import {
 import { loadPersistedLocation } from "../location-manager.js";
 import { SESSION_TOKEN_ENV_VAR } from "../config.js";
 
-async function runRefresh(timeoutSeconds: number): Promise<void> {
-  const token = await refreshAndPersistTokenViaBrowser(timeoutSeconds);
+async function runRefresh(options: {
+  timeoutSeconds?: number;
+  headless?: boolean;
+  operationLabel?: string;
+}): Promise<void> {
+  const token = await refreshAndPersistTokenViaBrowser(options);
   console.log(
     JSON.stringify(
       {
@@ -18,6 +22,7 @@ async function runRefresh(timeoutSeconds: number): Promise<void> {
         token: maskToken(token),
         source: "persisted",
         browser_profile_path: getBrowserDataDir(),
+        headless: options.headless ?? false,
       },
       null,
       2
@@ -32,7 +37,11 @@ export function registerAuthCommands(program: Command): void {
     .option("--timeout <seconds>", "Login timeout in seconds", parseInt)
     .action(async (opts: { timeout?: number }) => {
       try {
-        await runRefresh(opts.timeout ?? 120);
+        await runRefresh({
+          timeoutSeconds: opts.timeout ?? 120,
+          headless: false,
+          operationLabel: "Login",
+        });
       } catch (error) {
         console.log(JSON.stringify({ error: (error as Error).message }));
         process.exit(1);
@@ -43,9 +52,14 @@ export function registerAuthCommands(program: Command): void {
     .command("auth-refresh")
     .description("Refresh the session token using the persistent browser profile")
     .option("--timeout <seconds>", "Refresh timeout in seconds", parseInt)
-    .action(async (opts: { timeout?: number }) => {
+    .option("--headed", "Use a visible browser window instead of headless refresh")
+    .action(async (opts: { timeout?: number; headed?: boolean }) => {
       try {
-        await runRefresh(opts.timeout ?? 120);
+        await runRefresh({
+          timeoutSeconds: opts.timeout ?? 120,
+          headless: !opts.headed,
+          operationLabel: "Auth refresh",
+        });
       } catch (error) {
         console.log(JSON.stringify({ error: (error as Error).message }));
         process.exit(1);

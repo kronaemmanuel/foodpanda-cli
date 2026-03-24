@@ -43,6 +43,14 @@ node build/cli.js auth-refresh
 ```
 
 `auth-refresh` reuses the CLI's own persistent browser profile under `~/.foodpanda-pk-cli/browser-data`.
+It runs headless by default and is meant for silent refresh when the saved browser session is still valid.
+If silent refresh fails, use the visible login flow instead:
+
+```bash
+cd "{baseDir}/../.."
+node build/cli.js login
+```
+
 It does not directly read from OpenClaw's managed `openclaw` Chrome profile.
 
 ## Address-first workflow
@@ -78,7 +86,7 @@ Use this order unless the user explicitly asks for manual location control:
 - `address-use` is the normal way to set delivery location. It syncs `location.json` automatically.
 - Manual `location` is fallback-only. Use it only if the user explicitly wants nearest-address behavior without selecting a saved address.
 - `auth-status` shows whether the CLI is using an env-var token or its persisted token cache.
-- Session expiry is expected. Recover with `auth-refresh`.
+- Session expiry is expected. Recover with headless `auth-refresh`, and fall back to visible `login` if the saved browser session has expired.
 - For Windows shells, prefer `--item-id` or `--items-file` over escaped JSON for `add`.
 - `order` places a real order. Never run it without clear user confirmation in the conversation.
 - Live checkout has only been validated for `payment_on_delivery`.

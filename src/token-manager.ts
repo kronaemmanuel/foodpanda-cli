@@ -91,9 +91,21 @@ export function persistToken(token: string): void {
   });
 }
 
+interface RefreshTokenViaBrowserOptions {
+  timeoutSeconds?: number;
+  headless?: boolean;
+  operationLabel?: string;
+}
+
 export async function refreshTokenViaBrowser(
-  timeoutSeconds: number = 120
+  options: RefreshTokenViaBrowserOptions = {}
 ): Promise<string> {
+  const {
+    timeoutSeconds = 120,
+    headless = false,
+    operationLabel = headless ? "Auth refresh" : "Login",
+  } = options;
+
   // Use playwright-extra with stealth plugin to avoid bot detection.
   // This patches navigator.webdriver, Chrome automation signals, and other
   // fingerprinting vectors that Google OAuth and foodpanda use to block bots.
@@ -117,7 +129,7 @@ export async function refreshTokenViaBrowser(
   let context;
   try {
     context = await chromium.launchPersistentContext(BROWSER_DATA_DIR, {
-      headless: false,
+      headless,
     });
   } catch (err) {
     throw new Error(
@@ -132,7 +144,11 @@ export async function refreshTokenViaBrowser(
       const timer = setTimeout(() => {
         reject(
           new Error(
-            `Login timed out after ${timeoutSeconds} seconds. Please try again.`
+            `${operationLabel} timed out after ${timeoutSeconds} seconds. ${
+              headless
+                ? "If your saved cookies are no longer valid, run the visible login flow."
+                : "Please try again."
+            }`
           )
         );
       }, timeoutSeconds * 1000);
@@ -169,9 +185,9 @@ export async function refreshTokenViaBrowser(
 }
 
 export async function refreshAndPersistTokenViaBrowser(
-  timeoutSeconds: number = 120
+  options: RefreshTokenViaBrowserOptions = {}
 ): Promise<string> {
-  const token = await refreshTokenViaBrowser(timeoutSeconds);
+  const token = await refreshTokenViaBrowser(options);
   persistToken(token);
   return token;
 }
