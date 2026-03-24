@@ -12,17 +12,71 @@ interface PersistedToken {
   savedAt: string;
 }
 
-export function loadPersistedToken(): string | null {
+export interface ResolvedTokenInfo {
+  token: string | null;
+  source: "environment" | "persisted" | "none";
+  savedAt: string | null;
+}
+
+function loadPersistedTokenRecord(): PersistedToken | null {
   try {
     if (!existsSync(TOKEN_FILE)) return null;
     const data = JSON.parse(readFileSync(TOKEN_FILE, "utf-8")) as PersistedToken;
     if (data && typeof data.token === "string" && data.token.length > 0) {
-      return data.token;
+      return data;
     }
     return null;
   } catch {
     return null;
   }
+}
+
+export function loadPersistedToken(): string | null {
+  return loadPersistedTokenRecord()?.token ?? null;
+}
+
+export function resolveToken(
+  envVarName: string,
+  env: NodeJS.ProcessEnv = process.env
+): ResolvedTokenInfo {
+  const envToken = env[envVarName]?.trim();
+  if (envToken) {
+    return {
+      token: envToken,
+      source: "environment",
+      savedAt: null,
+    };
+  }
+
+  const persisted = loadPersistedTokenRecord();
+  if (persisted) {
+    return {
+      token: persisted.token,
+      source: "persisted",
+      savedAt: persisted.savedAt,
+    };
+  }
+
+  return {
+    token: null,
+    source: "none",
+    savedAt: null,
+  };
+}
+
+export function hasPersistedBrowserProfile(): boolean {
+  return existsSync(BROWSER_DATA_DIR);
+}
+
+export function getBrowserDataDir(): string {
+  return BROWSER_DATA_DIR;
+}
+
+export function maskToken(token: string | null): string | null {
+  if (!token) return null;
+  return token.length > 16
+    ? `${token.slice(0, 8)}...${token.slice(-8)}`
+    : "****";
 }
 
 export function persistToken(token: string): void {
@@ -112,4 +166,12 @@ export async function refreshTokenViaBrowser(
   } finally {
     await context.close().catch(() => {});
   }
+}
+
+export async function refreshAndPersistTokenViaBrowser(
+  timeoutSeconds: number = 120
+): Promise<string> {
+  const token = await refreshTokenViaBrowser(timeoutSeconds);
+  persistToken(token);
+  return token;
 }

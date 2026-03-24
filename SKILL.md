@@ -37,7 +37,7 @@ Before using any other commands, complete these two setup steps.
 
 ### 1. Log in
 
-Opens a browser window for the user to log in to foodpanda Pakistan. The session token is captured automatically.
+Opens the CLI's persistent browser profile for foodpanda Pakistan and captures the session token automatically.
 
 ```bash
 foodpanda-pk-cli login
@@ -47,6 +47,13 @@ Optional timeout:
 
 ```bash
 foodpanda-pk-cli login --timeout 180
+```
+
+Inspect auth state and refresh when needed:
+
+```bash
+foodpanda-pk-cli auth-status
+foodpanda-pk-cli auth-refresh
 ```
 
 Fallback:
@@ -133,14 +140,15 @@ Live ordering is supported for Cash on Delivery after a successful preview.
 ## Recommended workflow
 
 1. Log in
-2. List saved addresses
-3. Select the saved address you want to use
-4. Optionally inspect the active address with `address-current`
-5. Search restaurants
-6. Browse menu
-7. Build cart
-8. Run preview
-9. Place the order only after explicit user confirmation with `--confirm`
+2. If the cached session expires later, run `auth-refresh`
+3. List saved addresses
+4. Select the saved address you want to use
+5. Optionally inspect the active address with `address-current`
+6. Search restaurants
+7. Browse menu
+8. Build cart
+9. Run preview
+10. Place the order only after explicit user confirmation with `--confirm`
 
 ## Important rules
 
@@ -149,4 +157,6 @@ Live ordering is supported for Cash on Delivery after a successful preview.
 - Cart switching still replaces the current cart when a different restaurant is used
 - All errors are returned as JSON
 - Location is normally derived from the selected saved address; manual `location` is optional fallback behavior
+- Session tokens expire; use `auth-refresh` to recover with the CLI's persistent browser profile
+- The CLI auth profile is separate from OpenClaw's browser profile
 - This tool is Pakistan-specific

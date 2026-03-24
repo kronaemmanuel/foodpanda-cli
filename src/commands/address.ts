@@ -8,7 +8,7 @@ export function registerAddressCommands(program: Command): void {
     .description("List saved delivery addresses")
     .action(async () => {
       try {
-        const client = createClient();
+        const client = createClient({ requireLocation: false });
         const addresses = await client.listSavedAddresses();
         persistClient(client);
         console.log(JSON.stringify(addresses, null, 2));
@@ -23,7 +23,7 @@ export function registerAddressCommands(program: Command): void {
     .description("Select a saved delivery address by ID for preview and order")
     .action(async (addressId: string) => {
       try {
-        const client = createClient();
+        const client = createClient({ requireLocation: false });
         const parsedId = parseInt(addressId, 10);
         if (Number.isNaN(parsedId)) {
           throw new Error("Address ID must be a valid number.");
@@ -58,7 +58,7 @@ export function registerAddressCommands(program: Command): void {
     .description("Clear the saved-address override and use nearest-address selection")
     .action(() => {
       try {
-        const client = createClient();
+        const client = createClient({ requireLocation: false });
         client.clearSelectedDeliveryAddress();
         persistClient(client);
         console.log(JSON.stringify({ success: true, mode: "nearest" }, null, 2));
@@ -73,7 +73,7 @@ export function registerAddressCommands(program: Command): void {
     .description("Show the current address selection mode, active address, and synced location")
     .action(async () => {
       try {
-        const client = createClient();
+        const client = createClient({ requireLocation: false });
         const current = await client.getCurrentAddressInfo();
         persistClient(client);
         console.log(JSON.stringify(current, null, 2));

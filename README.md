@@ -8,6 +8,7 @@ All command output is JSON.
 
 Supported in this fork:
 - Pakistan login flow
+- Session status and browser-profile-based auth refresh
 - Saved-address-driven location sync
 - Restaurant search and discovery
 - Restaurant details and menu browsing
@@ -77,7 +78,19 @@ npm run build
 foodpanda-pk-cli login
 ```
 
-This opens foodpanda Pakistan in a browser and captures the session token from live requests.
+This opens foodpanda Pakistan in the CLI's persistent browser profile and captures the session token from live requests.
+
+You can inspect auth state at any time:
+
+```bash
+foodpanda-pk-cli auth-status
+```
+
+If the token expires later, refresh it without changing your workflow:
+
+```bash
+foodpanda-pk-cli auth-refresh
+```
 
 If browser capture does not work, set the session token manually through the environment:
 
@@ -105,6 +118,7 @@ foodpanda-pk-cli location <latitude> <longitude>
 You usually do not need this. It is only useful if you want nearest-address fallback behavior without selecting an explicit saved address first.
 
 Token, browser data, and cached state are stored under `~/.foodpanda-pk-cli/`.
+The reusable browser profile lives under `~/.foodpanda-pk-cli/browser-data`.
 
 ## Commands
 
@@ -153,6 +167,17 @@ foodpanda-pk-cli address-current
 
 `address-current` shows the active selection mode, the current synced location, and the address that preview/order will use.
 
+### Auth
+
+```bash
+foodpanda-pk-cli auth-status
+foodpanda-pk-cli auth-refresh
+```
+
+`auth-status` shows whether auth is coming from the environment or the persisted token cache, whether the CLI browser profile exists, and whether location is configured.
+
+`auth-refresh` reopens the CLI's persistent browser profile and captures a fresh token. This is the normal recovery path when the cached JWT expires.
+
 ### Preview
 
 ```bash
@@ -179,35 +204,39 @@ Live ordering is currently supported only for `payment_on_delivery` after a succ
 ## Recommended Workflow
 
 1. Run `login`.
-2. Run `addresses`.
-3. Run `address-use <address_id>` to select the saved address you want to use; this syncs the CLI location automatically.
-4. Optionally run `address-current` to verify the active address and location state.
-5. Search restaurants.
-6. Inspect a restaurant and browse its menu.
-7. Add items to cart.
-8. Run `preview`.
-9. If the user confirms, place the order with Cash on Delivery using `--confirm`.
+2. If auth later expires, run `auth-refresh` and continue.
+3. Run `addresses`.
+4. Run `address-use <address_id>` to select the saved address you want to use; this syncs the CLI location automatically.
+5. Optionally run `address-current` to verify the active address and location state.
+6. Search restaurants.
+7. Inspect a restaurant and browse its menu.
+8. Add items to cart.
+9. Run `preview`.
+10. If the user confirms, place the order with Cash on Delivery using `--confirm`.
 
 ## Suggested Live Smoke Test
 
 Suggested live smoke test using a saved Multan address:
 
 1. `foodpanda-pk-cli login`
-2. `foodpanda-pk-cli addresses`
-3. `foodpanda-pk-cli address-use <address_id>`
-4. `foodpanda-pk-cli address-current`
-5. `foodpanda-pk-cli search "biryani" --limit 5`
-6. `foodpanda-pk-cli restaurant <vendor_code>`
-7. `foodpanda-pk-cli menu <vendor_code>`
-8. `foodpanda-pk-cli add <vendor_code> --item-id product-code --quantity 1`
-9. `foodpanda-pk-cli cart`
-10. `foodpanda-pk-cli preview`
-11. `foodpanda-pk-cli order --payment payment_on_delivery --confirm`
+2. `foodpanda-pk-cli auth-status`
+3. `foodpanda-pk-cli addresses`
+4. `foodpanda-pk-cli address-use <address_id>`
+5. `foodpanda-pk-cli address-current`
+6. `foodpanda-pk-cli search "biryani" --limit 5`
+7. `foodpanda-pk-cli restaurant <vendor_code>`
+8. `foodpanda-pk-cli menu <vendor_code>`
+9. `foodpanda-pk-cli add <vendor_code> --item-id product-code --quantity 1`
+10. `foodpanda-pk-cli cart`
+11. `foodpanda-pk-cli preview`
+12. `foodpanda-pk-cli order --payment payment_on_delivery --confirm`
 
 ## Limitations
 
 - Pakistan market assumptions are centralized, but some internal API details are still reverse-engineered rather than officially documented
 - Live checkout has only been validated for Cash on Delivery
+- Session tokens expire; the intended recovery path is `auth-refresh`, which reuses the CLI's own persistent browser profile
+- The CLI does not directly read from OpenClaw's managed Chrome profile; its auth cache is separate under `~/.foodpanda-pk-cli/browser-data`
 - The repo is restaurant-focused only
 
 ## License

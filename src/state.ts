@@ -2,7 +2,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { FoodpandaClient, type SerializedState } from "./foodpanda-client.js";
-import { loadPersistedToken } from "./token-manager.js";
+import { resolveToken } from "./token-manager.js";
 import { loadPersistedLocation } from "./location-manager.js";
 import { APP_DATA_DIR, APP_NAME, SESSION_TOKEN_ENV_VAR } from "./config.js";
 
@@ -30,19 +30,20 @@ function saveState(state: SerializedState): void {
  * Create a FoodpandaClient with state restored from disk.
  * Returns the client. After executing a command, call `persistClient(client)`.
  */
-export function createClient(): FoodpandaClient {
-  const sessionToken =
-    loadPersistedToken() || process.env[SESSION_TOKEN_ENV_VAR] || null;
+export function createClient(options: { requireLocation?: boolean } = {}): FoodpandaClient {
+  const { requireLocation = true } = options;
+  const { token: sessionToken } = resolveToken(SESSION_TOKEN_ENV_VAR);
 
   const location = loadPersistedLocation();
 
-  if (!location) {
+  if (!location && requireLocation) {
     throw new Error(
-      `Location not set. Run: ${APP_NAME} location <latitude> <longitude>`
+      `Location not set. Run ${APP_NAME} addresses, then ${APP_NAME} address-use <address_id>, or set it manually with ${APP_NAME} location <latitude> <longitude>.`
     );
   }
 
-  const { latitude, longitude } = location;
+  const latitude = location?.latitude ?? 0;
+  const longitude = location?.longitude ?? 0;
 
   const client = new FoodpandaClient(sessionToken, latitude, longitude);
 

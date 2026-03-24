@@ -247,7 +247,7 @@ export class FoodpandaClient {
 
     if (response.status === 401 || response.status === 403) {
       throw new Error(
-        `Session token expired or invalid. Run ${APP_NAME} login again.`
+        `Session token expired or invalid. Run ${APP_NAME} auth-refresh or ${APP_NAME} login again.`
       );
     }
     if (!response.ok) {
@@ -278,7 +278,7 @@ export class FoodpandaClient {
 
     if (response.status === 401 || response.status === 403) {
       throw new Error(
-        `Session token expired or invalid. Run ${APP_NAME} login again.`
+        `Session token expired or invalid. Run ${APP_NAME} auth-refresh or ${APP_NAME} login again.`
       );
     }
     if (!response.ok) {
