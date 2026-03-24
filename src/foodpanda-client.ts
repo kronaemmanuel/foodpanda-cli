@@ -235,19 +235,35 @@ export class FoodpandaClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${MARKET_CONFIG.apiBaseUrl}${path}`;
+    const locationHeaders: Record<string, string> = {
+      "customer-latitude": String(this.latitude),
+      "customer-longitude": String(this.longitude),
+      locale: MARKET_CONFIG.locale,
+      platform: "web",
+      "x-global-entity-id": MARKET_CONFIG.globalEntityId,
+    };
+
+    if (this.customerCode) {
+      locationHeaders["customer-code"] = this.customerCode;
+    }
+
     const response = await fetch(url, {
       ...options,
       headers: {
         ...this.commonHeaders(),
         "x-pd-language-id": String(MARKET_CONFIG.languageId),
         "Content-Type": "application/json",
+        ...locationHeaders,
         ...((options.headers as Record<string, string>) || {}),
       },
     });
 
     if (response.status === 401 || response.status === 403) {
+      const body = await response.text().catch(() => "");
       throw new Error(
-        `Session token expired or invalid. Run ${APP_NAME} auth-refresh or ${APP_NAME} login again.`
+        `Foodpanda REST request failed (${response.status}) for ${path}: ${
+          body.slice(0, 300) || "no response body"
+        }`
       );
     }
     if (!response.ok) {
