@@ -52,6 +52,7 @@ node build/cli.js login
 ```
 
 It does not directly read from OpenClaw's managed `openclaw` Chrome profile.
+The same browser profile is also used as a fallback for protected vendor REST requests such as `restaurant` and `menu`.
 
 ## Address-first workflow
 
@@ -87,6 +88,7 @@ Use this order unless the user explicitly asks for manual location control:
 - Manual `location` is fallback-only. Use it only if the user explicitly wants nearest-address behavior without selecting a saved address.
 - `auth-status` shows whether the CLI is using an env-var token or its persisted token cache.
 - Session expiry is expected. Recover with headless `auth-refresh`, and fall back to visible `login` if the saved browser session has expired.
+- In stricter environments such as some VPS hosts, vendor/menu requests may be retried through the persistent browser context automatically.
 - For Windows shells, prefer `--item-id` or `--items-file` over escaped JSON for `add`.
 - `order` places a real order. Never run it without clear user confirmation in the conversation.
 - Live checkout has only been validated for `payment_on_delivery`.

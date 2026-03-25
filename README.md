@@ -12,6 +12,7 @@ Supported in this fork:
 - Saved-address-driven location sync
 - Restaurant search and discovery
 - Restaurant details and menu browsing
+- Browser-context retry for protected vendor/menu requests
 - Saved-address listing and explicit address selection
 - Cart add/remove/view
 - Order preview with saved-address resolution
@@ -99,6 +100,8 @@ If silent refresh fails because the browser session is no longer logged in, run 
 foodpanda-pk-cli login
 ```
 
+The same persistent browser profile is also used as a fallback for protected vendor REST endpoints such as `restaurant` and `menu` when plain server-side requests are blocked by anti-bot checks.
+
 If browser capture does not work, set the session token manually through the environment:
 
 ```bash
@@ -144,6 +147,8 @@ foodpanda-pk-cli restaurant <vendor_code>
 foodpanda-pk-cli menu <vendor_code>
 foodpanda-pk-cli item <vendor_code> <product_code>
 ```
+
+If vendor detail/menu REST requests are blocked in stricter environments such as some VPS hosts, the CLI retries those requests through the persistent Chromium browser context automatically.
 
 ### Cart
 
@@ -244,6 +249,7 @@ Suggested live smoke test using a saved Multan address:
 - Pakistan market assumptions are centralized, but some internal API details are still reverse-engineered rather than officially documented
 - Live checkout has only been validated for Cash on Delivery
 - Session tokens expire; the intended recovery path is `auth-refresh`, which reuses the CLI's own persistent browser profile in headless mode when the saved browser session is still valid
+- Some vendor endpoints may be challenged by anti-bot protection from server environments; the CLI retries vendor/menu requests through the persistent browser context before failing
 - The CLI does not directly read from OpenClaw's managed Chrome profile; its auth cache is separate under `~/.foodpanda-pk-cli/browser-data`
 - The repo is restaurant-focused only
 
